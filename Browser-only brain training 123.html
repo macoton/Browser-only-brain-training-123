@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>脳トレ123（ブラウザのみ）</title>
+  <style>
+    :root {
+      --bg: #0f1220;
+      --panel: #171a2b;
+      --accent: #7bdfff;
+      --good: #76e39c;
+      --bad: #ff7b7b;
+      --text: #e9eef7;
+      --muted: #aab3c6;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+      background: radial-gradient(1200px circle at 20% -10%, #26304f 0, var(--bg) 35%, #0b0e19 100%);
+      color: var(--text);
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+    .app {
+      width: min(920px, 100%);
+      display: grid;
+      gap: 16px;
+      grid-template-columns: 1fr 320px;
+      align-items: start;
+    }
+    .panel {
+      background: linear-gradient(180deg, #1b2034, var(--panel));
+      border: 1px solid #2a3253;
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: 0 12px 30px rgba(0,0,0,0.35);
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 20px;
+      letter-spacing: 0.2px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 10px;
+    }
+    .cell {
+      aspect-ratio: 1/1;
+      border-radius: 12px;
+      border: 1px solid #313a5c;
+      background: linear-gradient(180deg, #212845, #1a203a);
+      color: var(--text);
+      font-weight: 700;
+      font-size: clamp(18px, 2.6vw, 28px);
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      user-select: none;
+      transition: transform 80ms ease, background 150ms ease, border-color 150ms ease;
+    }
+    .cell:hover { transform: translateY(-2px); }
+    .cell.correct {
+      background: linear-gradient(180deg, #163023, #133121);
+      border-color: #285d44;
+      color: #c6ffde;
+    }
+    .cell.wrong {
+      animation: bump 180ms ease;
+      border-color: var(--bad);
+    }
+    @keyframes bump {
+      0% { transform: translateY(0); }
+      50% { transform: translateY(-3px); }
+      100% { transform: translateY(0); }
+    }
+    .sidebar { display: grid; gap: 12px; }
+    .metrics {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .metric {
+      background: #141a30;
+      border: 1px solid #2a3253;
+      border-radius: 12px;
+      padding: 12px;
+    }
+    .label { color: var(--muted); font-size: 13px; }
+    .value { font-size: 22px; font-weight: 700; margin-top: 4px; }
+    .controls { display: grid; grid-auto-flow: row; gap: 8px; }
+    button {
+      all: unset;
+      background: linear-gradient(180deg, #1f2747, #18203d);
+      border: 1px solid #2a3253;
+      color: var(--text);
+      padding: 12px 14px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: 600;
+      text-align: center;
+      transition: transform 80ms ease, background 150ms ease, border-color 150ms ease;
+    }
+    button:hover { transform: translateY(-2px); }
+    button.primary {
+      background: linear-gradient(180deg, #2a3e63, #213554);
+      border-color: #3a5077;
+    }
+    button.good {
+      background: linear-gradient(180deg, #246242, #1d5136);
+      border-color: #297552;
+    }
+    button.warn {
+      background: linear-gradient(180deg, #6a2c2c, #541f1f);
+      border-color: #8a3b3b;
+    }
+    .note {
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .list {
+      margin: 6px 0 0;
+      padding-left: 16px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .list li { margin: 2px 0; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="panel">
+      <h1>脳トレ123 — 1から順にクリック</h1>
+      <div id="grid" class="grid"></div>
+    </div>
+
+    <div class="panel sidebar">
+      <div class="metrics">
+        <div class="metric">
+          <div class="label">次の数字</div>
+          <div id="next" class="value">1</div>
+        </div>
+        <div class="metric">
+          <div class="label">タイム</div>
+          <div id="time" class="value">0.000 s</div>
+        </div>
+      </div>
+
+      <div class="metrics">
+        <div class="metric">
+          <div class="label">ベスト</div>
+          <div id="best" class="value">—</div>
+        </div>
+        <div class="metric">
+          <div class="label">ミス</div>
+          <div id="miss" class="value">0</div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <button id="start" class="primary">新しく並べる（スタート）</button>
+        <button id="save" class="good">スコアを保存（ファイル）</button>
+        <button id="load" class="primary">スコアを読み込み（ファイル）</button>
+        <button id="reset" class="warn">ベストをクリア（このセッション）</button>
+      </div>
+
+      <div class="note">
+        保存・読み込みは File System Access API を使います。初回は保存先ファイルを選んでください（例：scores.json）。
+        読み込みは同じファイルを選ぶと復元できます。
+        <ul class="list">
+          <li>計測は最初のクリックで開始、25を押したら停止</li>
+          <li>間違った数字を押すとミス数が加算</li>
+          <li>ベストは現在のセッションとファイルの両方で管理可能</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ---------- State ----------
+    const GRID_SIZE = 25;
+    let next = 1;
+    let startTs = null;
+    let timerId = null;
+    let missCount = 0;
+    let bestTime = null;
+    let fileHandle = null; // File System Access API handle
+
+    // ---------- Elements ----------
+    const gridEl = document.getElementById('grid');
+    const nextEl = document.getElementById('next');
+    const timeEl = document.getElementById('time');
+    const bestEl = document.getElementById('best');
+    const missEl = document.getElementById('miss');
+    const startBtn = document.getElementById('start');
+    const saveBtn = document.getElementById('save');
+    const loadBtn = document.getElementById('load');
+    const resetBtn = document.getElementById('reset');
+
+    // ---------- Utils ----------
+    const formatTime = (ms) => (ms == null ? '—' : (ms / 1000).toFixed(3) + ' s');
+    const shuffle = (arr) => {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    };
+
+    function updateHUD() {
+      nextEl.textContent = String(next);
+      missEl.textContent = String(missCount);
+      bestEl.textContent = formatTime(bestTime);
+    }
+
+    function startTimer() {
+      if (timerId) return;
+      startTs = performance.now();
+      timerId = setInterval(() => {
+        const now = performance.now();
+        timeEl.textContent = formatTime(now - startTs);
+      }, 16);
+    }
+
+    function stopTimer() {
+      if (!timerId) return;
+      clearInterval(timerId);
+      timerId = null;
+      const final = performance.now() - startTs;
+      timeEl.textContent = formatTime(final);
+      return final;
+    }
+
+    function renderGrid(numbers) {
+      gridEl.innerHTML = '';
+      numbers.forEach(n => {
+        const btn = document.createElement('button');
+        btn.className = 'cell';
+        btn.textContent = String(n);
+        btn.dataset.value = String(n);
+        btn.addEventListener('click', onCellClick);
+        gridEl.appendChild(btn);
+      });
+    }
+
+    function markCorrect(n) {
+      const el = gridEl.querySelector(`.cell[data-value="${n}"]`);
+      if (el) el.classList.add('correct');
+    }
+
+    function pulseWrong(n) {
+      const el = gridEl.querySelector(`.cell[data-value="${n}"]`);
+      if (el) {
+        el.classList.add('wrong');
+        setTimeout(() => el.classList.remove('wrong'), 180);
+      }
+    }
+
+    // ---------- Core ----------
+    function newRound() {
+      const nums = shuffle(Array.from({ length: GRID_SIZE }, (_, i) => i + 1));
+      renderGrid(nums);
+      next = 1;
+      missCount = 0;
+      startTs = null;
+      if (timerId) { clearInterval(timerId); timerId = null; }
+      timeEl.textContent = '0.000 s';
+      updateHUD();
+    }
+
+    function onCellClick(e) {
+      const val = Number(e.currentTarget.dataset.value);
+      if (next === 1) startTimer();
+
+      if (val === next) {
+        markCorrect(val);
+        next += 1;
+        updateHUD();
+        if (next > GRID_SIZE) {
+          const final = stopTimer();
+          // Update best
+          if (bestTime == null || final < bestTime) {
+            bestTime = final;
+            updateHUD();
+          }
+        }
+      } else {
+        missCount += 1;
+        updateHUD();
+        pulseWrong(val);
+      }
+    }
+
+    // ---------- File System Access API ----------
+    async function saveScores() {
+      try {
+        // Reuse existing handle if we have it, else prompt to create/select
+        if (!fileHandle) {
+          fileHandle = await window.showSaveFilePicker({
+            suggestedName: 'scores.json',
+            types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }]
+          });
+        }
+        const writable = await fileHandle.createWritable();
+        const payload = {
+          updatedAt: new Date().toISOString(),
+          gridSize: GRID_SIZE,
+          bestTimeMs: bestTime ?? null,
+          misses: missCount,
+        };
+        await writable.write(JSON.stringify(payload, null, 2));
+        await writable.close();
+        alert('スコアを保存しました。');
+      } catch (err) {
+        console.error(err);
+        alert('保存に失敗しました。ブラウザ設定（サイトにファイルアクセスを許可）をご確認ください。');
+      }
+    }
+
+    async function loadScores() {
+      try {
+        fileHandle = (await window.showOpenFilePicker({
+          types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }],
+          multiple: false
+        }))[0];
+        const file = await fileHandle.getFile();
+        const text = await file.text();
+        const data = JSON.parse(text);
+        if (typeof data.bestTimeMs === 'number') {
+          bestTime = data.bestTimeMs;
+        }
+        missCount = Number.isFinite(data.misses) ? data.misses : 0;
+        updateHUD();
+        alert('スコアを読み込みました。');
+      } catch (err) {
+        console.error(err);
+        alert('読み込みに失敗しました。ファイル内容がJSONか、権限が許可されているか確認してください。');
+      }
+    }
+
+    // ---------- Events ----------
+    startBtn.addEventListener('click', newRound);
+    saveBtn.addEventListener('click', saveScores);
+    loadBtn.addEventListener('click', loadScores);
+    resetBtn.addEventListener('click', () => { bestTime = null; updateHUD(); });
+
+    // ---------- Init ----------
+    newRound();
+    updateHUD();
+  </script>
+</body>
+</html>
