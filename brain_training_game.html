@@ -5,11 +5,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>脳トレゲーム</title>
     <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        #sizeSelector {
+            margin-bottom: 20px;
+        }
+        button {
+            padding: 10px 20px;
+            margin-right: 10px;
+            font-size: 16px;
+            cursor: pointer;
+        }
         #grid {
             display: grid;
-            grid-template-columns: repeat(8, 50px);
-            grid-template-rows: repeat(8, 50px);
             gap: 5px;
+            margin-top: 20px;
+            width: fit-content;
         }
         .cell {
             display: flex;
@@ -18,6 +30,8 @@
             border: 1px solid #000;
             cursor: pointer;
             font-size: 20px;
+            width: 50px;
+            height: 50px;
         }
         .cell.hidden {
             visibility: hidden;
@@ -29,28 +43,48 @@
 </head>
 <body>
     <h1>脳トレゲーム</h1>
+    <div id="sizeSelector">
+        <label>グリッドサイズを選択:</label>
+        <button onclick="startGame(5)">5×5</button>
+        <button onclick="startGame(8)">8×8</button>
+    </div>
     <div id="grid"></div>
     <script>
-        const grid = document.getElementById('grid');
-        const numbers = Array.from({ length: 64 }, (_, i) => i + 1);
-        numbers.sort(() => Math.random() - 0.5); // ランダムに並べ替え
-
         let currentNumber = 1;
         let startTime;
+        let gridSize = 0;
 
-        numbers.forEach(num => {
-            const cell = document.createElement('div');
-            cell.className = 'cell';
-            cell.textContent = num;
-            cell.addEventListener('click', () => handleClick(num, cell));
-            grid.appendChild(cell);
-        });
+        function startGame(size) {
+            gridSize = size;
+            const grid = document.getElementById('grid');
+            grid.innerHTML = ''; // グリッドをクリア
+            
+            // グリッドテンプレートを設定
+            grid.style.gridTemplateColumns = `repeat(${size}, 50px)`;
+            grid.style.gridTemplateRows = `repeat(${size}, 50px)`;
 
-        function handleClick(num, cell) {
+            const totalCells = size * size;
+            const numbers = Array.from({ length: totalCells }, (_, i) => i + 1);
+            numbers.sort(() => Math.random() - 0.5); // ランダムに並べ替え
+
+            currentNumber = 1;
+
+            numbers.forEach(num => {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                cell.textContent = num;
+                cell.addEventListener('click', () => handleClick(num, cell, totalCells));
+                grid.appendChild(cell);
+            });
+
+            startTime = new Date(); // ゲーム開始時間
+        }
+
+        function handleClick(num, cell, totalCells) {
             if (num === currentNumber) {
                 cell.classList.add('hidden');
                 currentNumber++;
-                if (currentNumber === 65) {
+                if (currentNumber === totalCells + 1) {
                     const endTime = new Date();
                     const elapsedSeconds = (endTime - startTime) / 1000;
                     const minutes = Math.floor(elapsedSeconds / 60);
@@ -59,8 +93,6 @@
                 }
             }
         }
-
-        startTime = new Date(); // ゲーム開始時間
     </script>
 </body>
 </html>
