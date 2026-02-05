@@ -19,6 +19,12 @@
             cursor: pointer;
             font-size: 20px;
         }
+        .cell.hidden {
+            visibility: hidden;
+            background-color: transparent;
+            border: none;
+            cursor: default;
+        }
     </style>
 </head>
 <body>
@@ -42,7 +48,7 @@
 
         function handleClick(num, cell) {
             if (num === currentNumber) {
-                cell.style.display = 'none';
+                cell.classList.add('hidden');
                 currentNumber++;
                 if (currentNumber === 65) {
                     const endTime = new Date();
