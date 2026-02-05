@@ -44,22 +44,87 @@
         .cell.wrong {
             background-color: red;
         }
+        .screen {
+            display: none;
+        }
+        .screen.active {
+            display: block;
+        }
+        #recordsTable {
+            margin-top: 20px;
+            border-collapse: collapse;
+        }
+        #recordsTable th, #recordsTable td {
+            border: 1px solid #000;
+            padding: 10px;
+            text-align: center;
+        }
+        #recordsTable th {
+            background-color: #f0f0f0;
+        }
     </style>
 </head>
 <body>
-    <h1>脳トレゲーム</h1>
-    <div id="sizeSelector">
-        <label>グリッドサイズを選択:</label>
-        <button onclick="startGame(5)">5×5</button>
-        <button onclick="startGame(6)">6×6</button>
-        <button onclick="startGame(7)">7×7</button>
-        <button onclick="startGame(8)">8×8</button>
+    <!-- ゲーム画面 -->
+    <div id="gameScreen" class="screen active">
+        <h1>脳トレゲーム</h1>
+        <div id="sizeSelector">
+            <label>グリッドサイズを選択:</label>
+            <button onclick="startGame(5)">5×5</button>
+            <button onclick="startGame(6)">6×6</button>
+            <button onclick="startGame(7)">7×7</button>
+            <button onclick="startGame(8)">8×8</button>
+        </div>
+        <div id="grid"></div>
+        <button onclick="showRecords()" style="margin-top: 20px;">記録を確認</button>
     </div>
-    <div id="grid"></div>
+
+    <!-- 記録画面 -->
+    <div id="recordScreen" class="screen">
+        <h1>ゲーム記録</h1>
+        <table id="recordsTable">
+            <thead>
+                <tr>
+                    <th>グリッドサイズ</th>
+                    <th>所要時間</th>
+                    <th>日時</th>
+                </tr>
+            </thead>
+            <tbody id="recordsBody">
+            </tbody>
+        </table>
+        <button onclick="showGame()" style="margin-top: 20px;">ゲームに戻る</button>
+        <button onclick="clearRecords()" style="margin-top: 20px;">記録を削除</button>
+    </div>
+
     <script>
         let currentNumber = 1;
         let startTime;
         let gridSize = 0;
+        let records = [];
+
+        // ローカルストレージから記録を読み込む
+        function loadRecords() {
+            const saved = localStorage.getItem('gameRecords');
+            if (saved) {
+                records = JSON.parse(saved);
+            }
+        }
+
+        // 記録をローカルストレージに保存
+        function saveRecords() {
+            localStorage.setItem('gameRecords', JSON.stringify(records));
+        }
+
+        // 記録を追加
+        function addRecord(size, time, datetime) {
+            records.push({
+                size: size,
+                time: time,
+                datetime: datetime
+            });
+            saveRecords();
+        }
 
         function startGame(size) {
             gridSize = size;
@@ -80,14 +145,14 @@
                 const cell = document.createElement('div');
                 cell.className = 'cell';
                 cell.textContent = num;
-                cell.addEventListener('click', () => handleClick(num, cell, totalCells));
+                cell.addEventListener('click', () => handleClick(num, cell, totalCells, size));
                 grid.appendChild(cell);
             });
 
             startTime = new Date(); // ゲーム開始時間
         }
 
-        function handleClick(num, cell, totalCells) {
+        function handleClick(num, cell, totalCells, size) {
             if (num === currentNumber) {
                 cell.classList.add('hidden');
                 currentNumber++;
@@ -96,7 +161,21 @@
                     const elapsedSeconds = (endTime - startTime) / 1000;
                     const minutes = Math.floor(elapsedSeconds / 60);
                     const seconds = Math.floor(elapsedSeconds % 60);
-                    alert(`ゲーム終了！所要時間: ${minutes}分${seconds}秒`);
+                    const timeStr = `${minutes}分${seconds}秒`;
+                    
+                    // 日時を取得
+                    const year = endTime.getFullYear();
+                    const month = String(endTime.getMonth() + 1).padStart(2, '0');
+                    const date = String(endTime.getDate()).padStart(2, '0');
+                    const hours = String(endTime.getHours()).padStart(2, '0');
+                    const mins = String(endTime.getMinutes()).padStart(2, '0');
+                    const secs = String(endTime.getSeconds()).padStart(2, '0');
+                    const datetimeStr = `${year}年${month}月${date}日 ${hours}:${mins}:${secs}`;
+                    
+                    // 記録に追加
+                    addRecord(`${size}×${size}`, timeStr, datetimeStr);
+                    
+                    alert(`ゲーム終了！所要時間: ${timeStr}`);
                 }
             } else {
                 // 間違ったマス目を赤くして、500ms後に青に戻す
@@ -106,6 +185,41 @@
                 }, 500);
             }
         }
+
+        function showRecords() {
+            loadRecords();
+            const recordsBody = document.getElementById('recordsBody');
+            recordsBody.innerHTML = '';
+            
+            records.forEach(record => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${record.size}</td>
+                    <td>${record.time}</td>
+                    <td>${record.datetime}</td>
+                `;
+                recordsBody.appendChild(row);
+            });
+
+            document.getElementById('gameScreen').classList.remove('active');
+            document.getElementById('recordScreen').classList.add('active');
+        }
+
+        function showGame() {
+            document.getElementById('recordScreen').classList.remove('active');
+            document.getElementById('gameScreen').classList.add('active');
+        }
+
+        function clearRecords() {
+            if (confirm('本当に全ての記録を削除しますか？')) {
+                records = [];
+                saveRecords();
+                showRecords();
+            }
+        }
+
+        // ページ読み込み時に記録を読み込む
+        loadRecords();
     </script>
 </body>
 </html>
