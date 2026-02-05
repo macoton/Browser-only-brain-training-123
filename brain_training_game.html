@@ -52,7 +52,10 @@
                 currentNumber++;
                 if (currentNumber === 65) {
                     const endTime = new Date();
-                    alert(`ゲーム終了！所要時間: ${(endTime - startTime) / 1000}秒`);
+                    const elapsedSeconds = (endTime - startTime) / 1000;
+                    const minutes = Math.floor(elapsedSeconds / 60);
+                    const seconds = Math.floor(elapsedSeconds % 60);
+                    alert(`ゲーム終了！所要時間: ${minutes}分${seconds}秒`);
                 }
             }
         }
