@@ -42,7 +42,7 @@
 
         function handleClick(num, cell) {
             if (num === currentNumber) {
-                cell.style.backgroundColor = 'lightgreen';
+                cell.style.display = 'none';
                 currentNumber++;
                 if (currentNumber === 65) {
                     const endTime = new Date();
