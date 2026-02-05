@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>脳トレゲーム</title>
+    <style>
+        #grid {
+            display: grid;
+            grid-template-columns: repeat(8, 50px);
+            grid-template-rows: repeat(8, 50px);
+            gap: 5px;
+        }
+        .cell {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border: 1px solid #000;
+            cursor: pointer;
+            font-size: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>脳トレゲーム</h1>
+    <div id="grid"></div>
+    <script>
+        const grid = document.getElementById('grid');
+        const numbers = Array.from({ length: 64 }, (_, i) => i + 1);
+        numbers.sort(() => Math.random() - 0.5); // ランダムに並べ替え
+
+        let currentNumber = 1;
+        let startTime;
+
+        numbers.forEach(num => {
+            const cell = document.createElement('div');
+            cell.className = 'cell';
+            cell.textContent = num;
+            cell.addEventListener('click', () => handleClick(num, cell));
+            grid.appendChild(cell);
+        });
+
+        function handleClick(num, cell) {
+            if (num === currentNumber) {
+                cell.style.backgroundColor = 'lightgreen';
+                currentNumber++;
+                if (currentNumber === 65) {
+                    const endTime = new Date();
+                    alert(`ゲーム終了！所要時間: ${(endTime - startTime) / 1000}秒`);
+                }
+            }
+        }
+
+        startTime = new Date(); // ゲーム開始時間
+    </script>
+</body>
+</html>
