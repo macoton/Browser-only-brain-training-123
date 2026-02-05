@@ -62,6 +62,9 @@
         #recordsTable th {
             background-color: #f0f0f0;
         }
+        #fileInput {
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -93,9 +96,15 @@
             <tbody id="recordsBody">
             </tbody>
         </table>
-        <button onclick="showGame()" style="margin-top: 20px;">ゲームに戻る</button>
-        <button onclick="clearRecords()" style="margin-top: 20px;">記録を削除</button>
+        <div style="margin-top: 20px;">
+            <button onclick="showGame()">ゲームに戻る</button>
+            <button onclick="clearRecords()">記録を削除</button>
+            <button onclick="exportRecords()">JSONで出力</button>
+            <button onclick="importRecords()">JSONから読み込み</button>
+        </div>
     </div>
+
+    <input type="file" id="fileInput" accept=".json">
 
     <script>
         let currentNumber = 1;
@@ -115,6 +124,48 @@
         function saveRecords() {
             localStorage.setItem('gameRecords', JSON.stringify(records));
         }
+
+        // JSONファイルにエクスポート
+        function exportRecords() {
+            const dataStr = JSON.stringify(records, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(dataBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `game_records_${new Date().getTime()}.json`;
+            link.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // JSONファイルからインポート
+        function importRecords() {
+            document.getElementById('fileInput').click();
+        }
+
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    try {
+                        const importedRecords = JSON.parse(event.target.result);
+                        if (Array.isArray(importedRecords)) {
+                            records = importedRecords;
+                            saveRecords();
+                            showRecords();
+                            alert('記録をインポートしました');
+                        } else {
+                            alert('無効なJSONファイルです');
+                        }
+                    } catch (error) {
+                        alert('ファイルの読み込みに失敗しました: ' + error.message);
+                    }
+                };
+                reader.readAsText(file);
+            }
+            // ファイル入力をリセット
+            e.target.value = '';
+        });
 
         // 記録を追加
         function addRecord(size, time, datetime) {
@@ -172,7 +223,7 @@
                     const secs = String(endTime.getSeconds()).padStart(2, '0');
                     const datetimeStr = `${year}年${month}月${date}日 ${hours}:${mins}:${secs}`;
                     
-                    // 記録に追加
+                    // 記録に追加（ここでセーブが実行される）
                     addRecord(`${size}×${size}`, timeStr, datetimeStr);
                     
                     alert(`ゲーム終了！所要時間: ${timeStr}`);
@@ -219,7 +270,9 @@
         }
 
         // ページ読み込み時に記録を読み込む
-        loadRecords();
+        window.addEventListener('DOMContentLoaded', function() {
+            loadRecords();
+        });
     </script>
 </body>
 </html>
