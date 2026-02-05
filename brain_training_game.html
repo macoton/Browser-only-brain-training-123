@@ -5,11 +5,35 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>脳トレゲーム</title>
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
         body {
             font-family: Arial, sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .screen {
+            display: none;
+            height: 100vh;
+            padding: 20px;
+            overflow-y: auto;
+            flex-direction: column;
+        }
+        .screen.active {
+            display: flex;
+        }
+        h1 {
+            margin-bottom: 20px;
+            flex-shrink: 0;
         }
         #sizeSelector {
             margin-bottom: 20px;
+            flex-shrink: 0;
         }
         button {
             padding: 10px 20px;
@@ -17,11 +41,16 @@
             font-size: 16px;
             cursor: pointer;
         }
+        #gameContainer {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex: 1;
+            min-height: 0;
+        }
         #grid {
             display: grid;
             gap: 5px;
-            margin-top: 20px;
-            width: fit-content;
         }
         .cell {
             display: flex;
@@ -29,11 +58,9 @@
             align-items: center;
             border: 1px solid #000;
             cursor: pointer;
-            font-size: 20px;
-            width: 50px;
-            height: 50px;
             background-color: blue;
             color: white;
+            font-weight: bold;
         }
         .cell.hidden {
             visibility: hidden;
@@ -44,15 +71,13 @@
         .cell.wrong {
             background-color: red;
         }
-        .screen {
-            display: none;
-        }
-        .screen.active {
-            display: block;
+        #recordScreen {
+            flex-direction: column;
         }
         #recordsTable {
             margin-top: 20px;
             border-collapse: collapse;
+            flex-shrink: 0;
         }
         #recordsTable th, #recordsTable td {
             border: 1px solid #000;
@@ -64,6 +89,10 @@
         }
         #fileInput {
             display: none;
+        }
+        .button-group {
+            margin-top: 20px;
+            flex-shrink: 0;
         }
     </style>
 </head>
@@ -78,7 +107,9 @@
             <button onclick="startGame(7)">7×7</button>
             <button onclick="startGame(8)">8×8</button>
         </div>
-        <div id="grid"></div>
+        <div id="gameContainer">
+            <div id="grid"></div>
+        </div>
         <button onclick="showRecords()" style="margin-top: 20px;">記録を確認</button>
     </div>
 
@@ -96,7 +127,7 @@
             <tbody id="recordsBody">
             </tbody>
         </table>
-        <div style="margin-top: 20px;">
+        <div class="button-group">
             <button onclick="showGame()">ゲームに戻る</button>
             <button onclick="clearRecords()">記録を削除</button>
             <button onclick="exportRecords()">JSONで出力</button>
@@ -111,6 +142,20 @@
         let startTime;
         let gridSize = 0;
         let records = [];
+        let cellSize = 50;
+
+        // 画面サイズに基づいてセルサイズを計算
+        function calculateCellSize(size) {
+            const container = document.getElementById('gameContainer');
+            const maxWidth = container.clientWidth - 40; // パディング分を引く
+            const maxHeight = container.clientHeight - 40;
+            
+            const cellSizeByWidth = Math.floor(maxWidth / size);
+            const cellSizeByHeight = Math.floor(maxHeight / size);
+            
+            cellSize = Math.min(cellSizeByWidth, cellSizeByHeight, 100); // 最大100pxに制限
+            cellSize = Math.max(cellSize, 30); // 最小30pxに制限
+        }
 
         // ローカルストレージから記録を読み込む
         function loadRecords() {
@@ -163,7 +208,6 @@
                 };
                 reader.readAsText(file);
             }
-            // ファイル入力をリセット
             e.target.value = '';
         });
 
@@ -180,15 +224,19 @@
         function startGame(size) {
             gridSize = size;
             const grid = document.getElementById('grid');
-            grid.innerHTML = ''; // グリッドをクリア
+            grid.innerHTML = '';
+            
+            // セルサイズを計算
+            calculateCellSize(size);
             
             // グリッドテンプレートを設定
-            grid.style.gridTemplateColumns = `repeat(${size}, 50px)`;
-            grid.style.gridTemplateRows = `repeat(${size}, 50px)`;
+            grid.style.gridTemplateColumns = `repeat(${size}, ${cellSize}px)`;
+            grid.style.gridTemplateRows = `repeat(${size}, ${cellSize}px)`;
+            grid.style.gap = '5px';
 
             const totalCells = size * size;
             const numbers = Array.from({ length: totalCells }, (_, i) => i + 1);
-            numbers.sort(() => Math.random() - 0.5); // ランダムに並べ替え
+            numbers.sort(() => Math.random() - 0.5);
 
             currentNumber = 1;
 
@@ -196,11 +244,14 @@
                 const cell = document.createElement('div');
                 cell.className = 'cell';
                 cell.textContent = num;
+                cell.style.width = cellSize + 'px';
+                cell.style.height = cellSize + 'px';
+                cell.style.fontSize = Math.max(12, cellSize / 3) + 'px';
                 cell.addEventListener('click', () => handleClick(num, cell, totalCells, size));
                 grid.appendChild(cell);
             });
 
-            startTime = new Date(); // ゲーム開始時間
+            startTime = new Date();
         }
 
         function handleClick(num, cell, totalCells, size) {
@@ -214,7 +265,6 @@
                     const seconds = Math.floor(elapsedSeconds % 60);
                     const timeStr = `${minutes}分${seconds}秒`;
                     
-                    // 日時を取得
                     const year = endTime.getFullYear();
                     const month = String(endTime.getMonth() + 1).padStart(2, '0');
                     const date = String(endTime.getDate()).padStart(2, '0');
@@ -223,13 +273,11 @@
                     const secs = String(endTime.getSeconds()).padStart(2, '0');
                     const datetimeStr = `${year}年${month}月${date}日 ${hours}:${mins}:${secs}`;
                     
-                    // 記録に追加（ここでセーブが実行される）
                     addRecord(`${size}×${size}`, timeStr, datetimeStr);
                     
                     alert(`ゲーム終了！所要時間: ${timeStr}`);
                 }
             } else {
-                // 間違ったマス目を赤くして、500ms後に青に戻す
                 cell.classList.add('wrong');
                 setTimeout(() => {
                     cell.classList.remove('wrong');
@@ -268,6 +316,13 @@
                 showRecords();
             }
         }
+
+        // ウィンドウリサイズ時にゲームを再描画
+        window.addEventListener('resize', function() {
+            if (gridSize > 0) {
+                startGame(gridSize);
+            }
+        });
 
         // ページ読み込み時に記録を読み込む
         window.addEventListener('DOMContentLoaded', function() {
