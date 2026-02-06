@@ -258,13 +258,29 @@
             }
         }
 
-        // マージロード
+        // レコード同値判定
+        function recordsEqual(a, b) {
+            return a.size === b.size && a.time === b.time && a.datetime === b.datetime;
+        }
+
+        // マージロード（重複はスキップして1件だけ残す）
         function loadRecordsMerge() {
             if (pendingImportData) {
-                records = records.concat(pendingImportData);
+                loadRecords(); // 現在のrecordsを確実に読み込む
+                let added = 0;
+                let skipped = 0;
+                for (const imp of pendingImportData) {
+                    const exists = records.some(r => recordsEqual(r, imp));
+                    if (!exists) {
+                        records.push(imp);
+                        added++;
+                    } else {
+                        skipped++;
+                    }
+                }
                 saveRecords();
                 showRecords();
-                alert('記録をマージしました');
+                alert(`マージ完了: 追加 ${added} 件、重複スキップ ${skipped} 件`);
                 closeLoadModal();
             }
         }
