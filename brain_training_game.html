@@ -324,7 +324,7 @@
                 cell.textContent = num;
                 cell.style.width = cellSize + 'px';
                 cell.style.height = cellSize + 'px';
-                cell.style.fontSize = Math.max(12, cellSize / 3) + 'px';
+                cell.style.fontSize = Math.max(20, cellSize * 0.6) + 'px';
                 cell.addEventListener('click', () => handleClick(num, cell, totalCells, size));
                 grid.appendChild(cell);
             });
