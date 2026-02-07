@@ -195,11 +195,22 @@
             cellSize = Math.max(cellSize, 30);
         }
 
-        // ローカルストレージから記録を読み込む
+        // レコードを datetime の降順（新しい順）でソート
+        function sortRecords() {
+            records.sort((a, b) => {
+                // datetime は "YYYY年MM月DD日 HH:MM:SS" 形式なので文字列比較でOK
+                return b.datetime.localeCompare(a.datetime);
+            });
+        }
+
+        // ローカルストレージから記録を読み込む（読み込み後にソート）
         function loadRecords() {
             const saved = localStorage.getItem('gameRecords');
             if (saved) {
                 records = JSON.parse(saved);
+                sortRecords();
+            } else {
+                records = [];
             }
         }
 
@@ -251,6 +262,7 @@
         function loadRecordsSimple() {
             if (pendingImportData) {
                 records = pendingImportData;
+                sortRecords();
                 saveRecords();
                 showRecords();
                 alert('記録を上書きロードしました');
@@ -263,7 +275,7 @@
             return a.size === b.size && a.time === b.time && a.datetime === b.datetime;
         }
 
-        // マージロード（重複はスキップして1件だけ残す）
+        // マージロード（重複はスキップして1件だけ残す）、マージ後ソート
         function loadRecordsMerge() {
             if (pendingImportData) {
                 loadRecords(); // 現在のrecordsを確実に読み込む
@@ -278,6 +290,7 @@
                         skipped++;
                     }
                 }
+                sortRecords();
                 saveRecords();
                 showRecords();
                 alert(`マージ完了: 追加 ${added} 件、重複スキップ ${skipped} 件`);
