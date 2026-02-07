@@ -354,6 +354,11 @@
                     addRecord(`${size}×${size}`, timeStr, datetimeStr);
                     
                     alert(`ゲーム終了！所要時間: ${timeStr}`);
+                    
+                    // ゲーム終了後、マス目をクリア
+                    const grid = document.getElementById('grid');
+                    grid.innerHTML = '';
+                    gridSize = 0;
                 }
             } else {
                 cell.classList.add('wrong');
