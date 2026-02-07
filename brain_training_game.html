@@ -50,7 +50,7 @@
         }
         #grid {
             display: grid;
-            gap: 5px;
+            gap: 2px;
         }
         .cell {
             display: flex;
@@ -58,8 +58,8 @@
             align-items: center;
             border: 1px solid #000;
             cursor: pointer;
-            background-color: blue;
-            color: white;
+            background-color: white;
+            color: black;
             font-weight: bold;
         }
         .cell.hidden {
@@ -310,7 +310,7 @@
             
             grid.style.gridTemplateColumns = `repeat(${size}, ${cellSize}px)`;
             grid.style.gridTemplateRows = `repeat(${size}, ${cellSize}px)`;
-            grid.style.gap = '5px';
+            grid.style.gap = '2px';
 
             const totalCells = size * size;
             const numbers = Array.from({ length: totalCells }, (_, i) => i + 1);
