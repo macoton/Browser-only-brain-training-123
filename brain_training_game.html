@@ -179,6 +179,7 @@
 
     <input type="file" id="fileInput" accept=".json">
 
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="https://apis.google.com/js/api.js"></script>
     <script>
         let currentNumber = 1;
@@ -188,6 +189,8 @@
         let cellSize = 50;
         let pendingImportData = null;
         let isGoogleDriveAuthorized = false;
+        let tokenClient = null;
+        let accessToken = null;
 
         // Google Drive API 関連定数
         const CLIENT_ID = 'YOUR_CLIENT_ID.apps.googleusercontent.com'; // Google CloudコンソールのクライアントIDに置き換え
@@ -195,53 +198,49 @@
         const SCOPES = 'https://www.googleapis.com/auth/drive.appdata';
         const FILENAME = 'brain_training_records.json';
 
-        // Google API の初期化
+        // Google Identity Services (GIS) + Drive REST を使う実装
         function initGoogleAPI() {
-            gapi.load('client:auth2', () => {
-                gapi.client.init({
-                    apiKey: API_KEY,
-                    clientId: CLIENT_ID,
+            // tokenClient を GIS で初期化
+            if (window.google && google.accounts && google.accounts.oauth2) {
+                tokenClient = google.accounts.oauth2.initTokenClient({
+                    client_id: CLIENT_ID,
                     scope: SCOPES,
-                    discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest']
-                }).then(() => {
-                    checkGoogleDriveAuth();
-                }).catch(err => {
-                    console.error('Google API初期化エラー:', err);
+                    callback: (tokenResponse) => {
+                        if (tokenResponse && tokenResponse.access_token) {
+                            accessToken = tokenResponse.access_token;
+                            isGoogleDriveAuthorized = true;
+                            updateGoogleDriveButtons();
+                            alert('Google Drive に認証しました');
+                        } else {
+                            console.error('tokenResponse:', tokenResponse);
+                        }
+                    }
                 });
-            });
-        }
-
-        // Google Drive 認証状態確認
-        function checkGoogleDriveAuth() {
-            const auth2 = gapi.auth2.getAuthInstance();
-            if (auth2.isSignedIn.get()) {
-                isGoogleDriveAuthorized = true;
-                updateGoogleDriveButtons();
+            } else {
+                console.error('GIS client not loaded');
             }
         }
 
-        // Google Drive 認証
-        function authorizeGoogleDrive() {
-            const auth2 = gapi.auth2.getAuthInstance();
-            auth2.signIn().then(() => {
-                isGoogleDriveAuthorized = true;
-                updateGoogleDriveButtons();
-                alert('Google Drive に認証しました');
-            }).catch(err => {
-                alert('認証エラー: ' + err);
-            });
-        }
-
-        // Google Drive ボタン表示
+        // ボタン表示更新
         function updateGoogleDriveButtons() {
             document.getElementById('driveAuthBtn').style.display = isGoogleDriveAuthorized ? 'none' : 'inline-block';
             document.getElementById('driveSaveBtn').style.display = isGoogleDriveAuthorized ? 'inline-block' : 'none';
             document.getElementById('driveLoadBtn').style.display = isGoogleDriveAuthorized ? 'inline-block' : 'none';
         }
 
-        // Google Drive に保存
-        function saveToGoogleDrive() {
-            if (!isGoogleDriveAuthorized) {
+        // 認証（トークン取得）
+        function authorizeGoogleDrive() {
+            if (!tokenClient) {
+                alert('初期化に失敗しました。ページを再読み込みしてください');
+                return;
+            }
+            // prompt オプションを指定して明示的に同意画面を表示したい場合は {prompt: 'consent'} を渡す
+            tokenClient.requestAccessToken({ prompt: 'consent' });
+        }
+
+        // Google Drive に保存（REST 使用）
+        async function saveToGoogleDrive() {
+            if (!isGoogleDriveAuthorized || !accessToken) {
                 alert('先に Google Drive に認証してください');
                 return;
             }
@@ -250,94 +249,96 @@
             const file = new Blob([fileContent], { type: 'application/json' });
 
             // 既存ファイルを検索
-            gapi.client.drive.files.list({
-                spaces: 'appDataFolder',
-                fields: 'files(id, name)',
-                pageSize: 10,
-                q: `name='${FILENAME}'`
-            }).then(response => {
-                const files = response.result.files;
+            const listUrl = `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&pageSize=10&fields=files(id,name)&q=${encodeURIComponent("name='"+FILENAME+"'")}`;
+            try {
+                const listRes = await fetch(listUrl, {
+                    headers: { 'Authorization': 'Bearer ' + accessToken }
+                });
+                const listData = await listRes.json();
+                const files = listData.files || [];
                 if (files.length > 0) {
-                    // ファイルが存在する場合は更新
-                    updateGoogleDriveFile(files[0].id, file);
+                    await updateGoogleDriveFile(files[0].id, file);
                 } else {
-                    // 新規作成
-                    createGoogleDriveFile(file);
+                    await createGoogleDriveFile(file);
                 }
-            });
+            } catch (err) {
+                console.error(err);
+                alert('保存エラー');
+            }
         }
 
-        // Google Drive ファイル作成
-        function createGoogleDriveFile(file) {
-            const metadata = {
-                name: FILENAME,
-                parents: ['appDataFolder']
-            };
-
+        // Google Drive ファイル作成（multipart upload）
+        async function createGoogleDriveFile(file) {
+            const metadata = { name: FILENAME, parents: ['appDataFolder'] };
             const form = new FormData();
             form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
             form.append('file', file);
 
-            fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
-                method: 'POST',
-                headers: {
-                    'Authorization': 'Bearer ' + gapi.auth2.getAuthInstance().currentUser.get().getAuthResponse().id_token
-                },
-                body: form
-            }).then(response => {
-                if (response.ok) {
+            try {
+                const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + accessToken },
+                    body: form
+                });
+                if (res.ok) {
                     alert('Google Drive に保存しました');
                 } else {
+                    console.error(await res.text());
                     alert('保存エラー');
                 }
-            });
+            } catch (err) {
+                console.error(err);
+                alert('保存エラー');
+            }
         }
 
         // Google Drive ファイル更新
-        function updateGoogleDriveFile(fileId, file) {
-            fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
-                method: 'PATCH',
-                headers: {
-                    'Authorization': 'Bearer ' + gapi.auth2.getAuthInstance().currentUser.get().getAuthResponse().id_token
-                },
-                body: file
-            }).then(response => {
-                if (response.ok) {
+        async function updateGoogleDriveFile(fileId, file) {
+            try {
+                const res = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
+                    method: 'PATCH',
+                    headers: { 'Authorization': 'Bearer ' + accessToken },
+                    body: file
+                });
+                if (res.ok) {
                     alert('Google Drive に保存しました');
                 } else {
+                    console.error(await res.text());
                     alert('保存エラー');
                 }
-            });
+            } catch (err) {
+                console.error(err);
+                alert('保存エラー');
+            }
         }
 
         // Google Drive から読み込み
-        function loadFromGoogleDrive() {
-            if (!isGoogleDriveAuthorized) {
+        async function loadFromGoogleDrive() {
+            if (!isGoogleDriveAuthorized || !accessToken) {
                 alert('先に Google Drive に認証してください');
                 return;
             }
 
-            gapi.client.drive.files.list({
-                spaces: 'appDataFolder',
-                fields: 'files(id, name)',
-                pageSize: 10,
-                q: `name='${FILENAME}'`
-            }).then(response => {
-                const files = response.result.files;
+            const listUrl = `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&pageSize=10&fields=files(id,name)&q=${encodeURIComponent("name='"+FILENAME+"'")}`;
+            try {
+                const listRes = await fetch(listUrl, { headers: { 'Authorization': 'Bearer ' + accessToken } });
+                const listData = await listRes.json();
+                const files = listData.files || [];
                 if (files.length > 0) {
                     const fileId = files[0].id;
-                    fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
-                        headers: {
-                            'Authorization': 'Bearer ' + gapi.auth2.getAuthInstance().currentUser.get().getAuthResponse().id_token
-                        }
-                    }).then(response => response.json()).then(data => {
-                        pendingImportData = data;
-                        document.getElementById('loadModal').classList.add('active');
+                    const fileRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+                        headers: { 'Authorization': 'Bearer ' + accessToken }
                     });
+                    const data = await fileRes.json();
+                    pendingImportData = data;
+                    document.getElementById('loadModal').classList.add('active');
                 } else {
                     alert('Google Drive にファイルがありません');
                 }
-            });
+            } catch (err) {
+                console.error(err);
+                alert('読み込みエラー');
+            }
         }
 
         // 画面サイズに基づいてセルサイズを計算
